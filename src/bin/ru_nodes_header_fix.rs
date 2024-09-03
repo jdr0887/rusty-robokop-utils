@@ -3,12 +3,9 @@ extern crate log;
 
 use clap::Parser;
 use humantime::format_duration;
-use itertools::Itertools;
-use rayon::prelude::*;
 use std::io;
 use std::io::prelude::*;
 use std::path;
-use std::path::PathBuf;
 use std::time::Instant;
 
 #[derive(Parser, PartialEq, Debug)]
@@ -32,11 +29,11 @@ fn main() {
     let reader = io::BufReader::new(nodes_input_file);
 
     let header = reader.lines().take(1).next().expect("Could not get header").unwrap();
-    header.split("\t").filter(|col| col.starts_with("MONDO_SUPERCLASS")).map(|col| col.clone()).for_each(|col| println!("{}", col));
+    header.split("\t").filter(|col| col.starts_with("MONDO_SUPERCLASS")).for_each(|col| println!("{}", col));
     println!("------------");
-    header.split("\t").filter(|col| col.starts_with("CHEBI_ROLE")).map(|col| col.clone()).for_each(|col| println!("{}", col));
+    header.split("\t").filter(|col| col.starts_with("CHEBI_ROLE")).for_each(|col| println!("{}", col));
     println!("------------");
-    header.split("\t").filter(|col| !col.starts_with("CHEBI_ROLE")).filter(|col| !col.starts_with("MONDO_SUPERCLASS")).map(|col| col.clone()).for_each(|col| println!("{}", col));
+    header.split("\t").filter(|col| !col.starts_with("CHEBI_ROLE")).filter(|col| !col.starts_with("MONDO_SUPERCLASS")).for_each(|col| println!("{}", col));
 
     info!("Duration: {}", format_duration(start.elapsed()).to_string());
 }

@@ -1,9 +1,5 @@
-use humantime::format_duration;
 use itertools::Itertools;
-use log::{info, warn};
-use rayon::prelude::*;
 use std::path::PathBuf;
-use std::time::Instant;
 
 fn main() {
     print_data(&std::path::PathBuf::from("/home/jdr0887/Downloads/RobokopKG/robokop_kg_edges.csv"));

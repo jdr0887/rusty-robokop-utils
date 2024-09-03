@@ -1,7 +1,8 @@
+#[macro_use]
+extern crate log;
+
 use humantime::format_duration;
 use itertools::Itertools;
-use log::{info, warn};
-use rayon::prelude::*;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::time::Instant;
