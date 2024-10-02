@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate log;
 
+use rayon::prelude::*;
 use clap::Parser;
 use humantime::format_duration;
 use itertools::Itertools;
@@ -37,8 +38,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let header = reader.lines().take(1).next().expect("Could not get header").unwrap();
     // println!("header: {}", header);
 
-    let keep_columns = header
-        .split("\t")
+    let header_columns = header.split("\t").collect_vec();
+
+    let keep_columns = header_columns.iter()
         .enumerate()
         .filter(|(_idx, col)| !col.starts_with("CHEBI_ROLE") && !col.starts_with("MONDO_SUPERCLASS"))
         .map(|(idx, col)| {
@@ -52,30 +54,34 @@ async fn main() -> Result<(), Box<dyn Error>> {
     new_header.push_str("\tCHEBI_ROLE");
     new_header.push_str("\tMONDO_SUPERCLASS");
 
-    let chebi_role_colums = header
-        .split("\t")
+    let chebi_role_colums: Vec<(usize, String)> = header_columns.iter()
         .enumerate()
         .filter(|(_idx, col)| col.starts_with("CHEBI_ROLE"))
         .map(|(idx, col)| {
-            let col_name_split = col.split(":").collect_vec();
-            let col_name = col_name_split.get(0).unwrap();
-            (idx, col_name.replace("CHEBI_ROLE_", ""))
-        })
+            let mut ret = None;
+            if let Some((prefix, _suffix)) = col.split_once(':') {
+                ret = Some((idx, prefix.replace("CHEBI_ROLE_", "")));
+            }
+            ret
+        }).filter_map(std::convert::identity)
         .collect_vec();
 
-    let mondo_superclass_colums = header
-        .split("\t")
+    let mondo_superclass_colums: Vec<(usize, String)> = header_columns.iter()
         .enumerate()
         .filter(|(_idx, col)| col.starts_with("MONDO_SUPERCLASS"))
         .map(|(idx, col)| {
-            let col_name_split = col.split(":").collect_vec();
-            let col_name = col_name_split.get(0).unwrap();
-            (idx, col_name.replace("MONDO_SUPERCLASS_", ""))
-        })
+            let mut ret = None;
+            if let Some((prefix, _suffix)) = col.split_once(':') {
+                ret = Some((idx, prefix.replace("MONDO_SUPERCLASS_", "")));
+            }
+            ret
+        }).filter_map(std::convert::identity)
         .collect_vec();
 
     let mut writer = std::io::BufWriter::new(fs::File::create(output.as_path()).unwrap());
     writer.write_all(format!("{}\n", new_header).as_bytes()).expect("Could not write line");
+
+    let separator = char::from_u32(0x0000001F).unwrap();
 
     let reader = std::io::BufReader::new(&input_file);
     reader.lines().skip(1).for_each(|line| {
@@ -88,35 +94,35 @@ async fn main() -> Result<(), Box<dyn Error>> {
             new_line.push_str(format!("{}\t", value).as_str());
         });
 
-        let chebi_role_labels = chebi_role_colums
-            .iter()
+        let chebi_role_labels: Vec<&str> = chebi_role_colums
+            .par_iter()
             .filter_map(|(idx, col)| {
-                let col_name_split = col.split(":").collect_vec();
-                let col_name = col_name_split.get(0).unwrap();
-                let value = line_split.get(idx.clone()).unwrap();
-                if "true".eq(*value) {
-                    Some(*col_name)
-                } else {
-                    None
+                let mut ret = None;
+                if let Some((prefix, _suffix)) = col.split_once(':') {
+                    let value = line_split.get(idx.clone()).unwrap();
+                    if "true".eq(*value) {
+                        ret = Some(prefix)
+                    }
                 }
+                ret
             })
-            .collect_vec();
-        new_line.push_str(format!("{}\t", chebi_role_labels.into_iter().join(format!("{}", char::from_u32(0x0000001F).unwrap()).as_str())).as_str());
+            .collect();
+        new_line.push_str(format!("{}\t", chebi_role_labels.into_iter().join(format!("{}", separator).as_str())).as_str());
 
-        let mondo_superclass_labels = mondo_superclass_colums
-            .iter()
+        let mondo_superclass_labels: Vec<&str> = mondo_superclass_colums
+            .par_iter()
             .filter_map(|(idx, col)| {
-                let col_name_split = col.split(":").collect_vec();
-                let col_name = col_name_split.get(0).unwrap();
-                let value = line_split.get(idx.clone()).unwrap();
-                if "true".eq(*value) {
-                    Some(*col_name)
-                } else {
-                    None
+                let mut ret = None;
+                if let Some((prefix, _suffix)) = col.split_once(':') {
+                    let value = line_split.get(idx.clone()).unwrap();
+                    if "true".eq(*value) {
+                        ret = Some(prefix)
+                    }
                 }
+                ret
             })
-            .collect_vec();
-        new_line.push_str(format!("{}\t", mondo_superclass_labels.into_iter().join(format!("{}", char::from_u32(0x0000001F).unwrap()).as_str())).as_str());
+            .collect();
+        new_line.push_str(mondo_superclass_labels.into_iter().join(format!("{}", separator).as_str()).as_str());
 
         writer.write_all(format!("{}\n", new_line).as_bytes()).expect("Could not write line");
     });
